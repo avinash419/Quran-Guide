@@ -4,7 +4,6 @@ import { Emotion, GuidanceResult } from "../types";
 
 const getApiKey = () => {
   try {
-    // Attempt to access process.env safely
     return process.env.API_KEY;
   } catch (e) {
     console.warn("API_KEY environment variable not accessible.");
@@ -14,13 +13,9 @@ const getApiKey = () => {
 
 export const getSpiritualGuidance = async (emotion: Emotion): Promise<GuidanceResult> => {
   const apiKey = getApiKey();
-  
-  if (!apiKey) {
-    throw new Error("Guidance service unavailable: API key not configured. Please check your deployment environment variables.");
-  }
+  if (!apiKey) throw new Error("API Key not configured");
 
   const ai = new GoogleGenAI({ apiKey });
-
   const prompt = `Provide a relevant Quranic Ayah and a short reflection for someone experiencing ${emotion}. 
   The response must be in Hindi for the reflection and translation. 
   The Ayah must be authentic from the Quran.`;
@@ -34,23 +29,40 @@ export const getSpiritualGuidance = async (emotion: Emotion): Promise<GuidanceRe
         responseSchema: {
           type: Type.OBJECT,
           properties: {
-            ayahArabic: { type: Type.STRING, description: "The original Arabic text of the Ayah." },
-            ayahHindi: { type: Type.STRING, description: "The Hindi translation of the Ayah." },
-            reflection: { type: Type.STRING, description: "A short, 2-3 sentence reflection/explanation in Hindi relating the Ayah to the emotion." },
-            reference: { type: Type.STRING, description: "The Surah name and Ayah number (e.g., Al-Baqarah 2:153)." }
+            ayahArabic: { type: Type.STRING },
+            ayahHindi: { type: Type.STRING },
+            reflection: { type: Type.STRING },
+            reference: { type: Type.STRING }
           },
           required: ["ayahArabic", "ayahHindi", "reflection", "reference"]
         }
       }
     });
-
-    if (!response || !response.text) {
-      throw new Error("Received empty response from the guidance service.");
-    }
-
-    return JSON.parse(response.text);
+    return JSON.parse(response.text || "{}");
   } catch (error) {
-    console.error("Spiritual Guidance Error:", error);
-    throw new Error("कुछ तकनीकी समस्या आई है। कृपया बाद में पुनः प्रयास करें।");
+    console.error("Guidance Error:", error);
+    throw new Error("कुछ तकनीकी समस्या आई है।");
+  }
+};
+
+export const getAyahReflection = async (arabic: string, hindi: string, surah: string, ayahNum: number): Promise<string> => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("API Key not configured");
+
+  const ai = new GoogleGenAI({ apiKey });
+  const prompt = `Quran Surah ${surah}, Ayah ${ayahNum} ka Arabic text: "${arabic}" aur Hindi anuvad: "${hindi}" hai. 
+  Is Ayah ka ek gehri ruhanai chintan (spiritual reflection) Hindi mein likhein jo insan ke dil ko sukoon de aur usey zindagi mein amal karne ki prerna de. 
+  Sirf 2-3 bade sentence likhein. Shuddh aur saral Hindi ka prayog karein. 
+  Dhyan rahe ki aapka vyavhar ek buzurg ya ruhanai ustad jaisa ho, kisi machine ya AI jaisa nahi.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-3-flash-preview",
+      contents: prompt,
+    });
+    return response.text?.trim() || "क्षमा करें, चिंतन उत्पन्न नहीं किया जा सका।";
+  } catch (error) {
+    console.error("Reflection Error:", error);
+    return "तकनीकी समस्या के कारण चिंतन उपलब्ध नहीं है।";
   }
 };
