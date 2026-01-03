@@ -31,6 +31,18 @@ const Reader: React.FC<ReaderProps> = ({ surah, onBack }) => {
     };
   }, [surah.number]);
 
+  const handleSpeakHindi = (text: string, id: number) => {
+    if (speakingId === id) {
+      window.speechSynthesis.cancel();
+      setSpeakingId(null);
+    } else {
+      audioRef.current?.pause();
+      setPlayingId(null);
+      setSpeakingId(id);
+      speakHindi(text, () => setSpeakingId(null));
+    }
+  };
+
   const toggleAudio = (ayahNumber: number) => {
     if (playingId === ayahNumber) {
       audioRef.current?.pause();
@@ -44,28 +56,16 @@ const Reader: React.FC<ReaderProps> = ({ surah, onBack }) => {
       audioRef.current = new Audio(url);
       audioRef.current.play();
       setPlayingId(ayahNumber);
+      
       audioRef.current.onended = () => {
+        setPlayingId(null);
+        // After Arabic ends, play Hindi translation automatically
         const currentIndex = ayahs.findIndex(a => a.number === ayahNumber);
-        if (currentIndex < ayahs.length - 1) {
-          toggleAudio(ayahs[currentIndex + 1].number);
-        } else {
-          setPlayingId(null);
+        const translationText = hindi[currentIndex]?.text;
+        if (translationText) {
+          handleSpeakHindi(translationText, ayahNumber);
         }
       };
-    }
-  };
-
-  const handleSpeakHindi = (text: string, id: number) => {
-    if (speakingId === id) {
-      window.speechSynthesis.cancel();
-      setSpeakingId(null);
-    } else {
-      audioRef.current?.pause();
-      setPlayingId(null);
-      setSpeakingId(id);
-      speakHindi(text);
-      // We can't easily detect end of speech synthesis for all browsers reliably, 
-      // but we reset on click or new action.
     }
   };
 
@@ -83,14 +83,14 @@ const Reader: React.FC<ReaderProps> = ({ surah, onBack }) => {
       <div className="sticky top-[72px] z-30 bg-white/90 backdrop-blur-xl border-b border-stone-100 px-4 py-3 flex justify-between items-center shadow-sm">
         <button 
             onClick={onBack} 
-            className="w-10 h-10 rounded-xl flex items-center justify-center text-stone-600 hover:bg-stone-50 active:scale-90 transition-all border border-stone-100"
+            className="w-12 h-12 rounded-xl flex items-center justify-center text-stone-600 hover:bg-stone-50 active:scale-90 transition-all border border-stone-100"
         >
-          <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          <svg className="w-7 h-7" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         </button>
         
         <div className="flex items-center gap-1 bg-stone-100 p-1 rounded-xl border border-stone-200">
-          <button onClick={() => setFontSize(prev => Math.max(20, prev - 4))} className="w-9 h-9 flex items-center justify-center text-stone-700 font-bold text-sm active:bg-white rounded-lg transition-colors">A-</button>
-          <button onClick={() => setFontSize(prev => Math.min(60, prev + 4))} className="w-9 h-9 flex items-center justify-center text-stone-700 font-bold text-sm active:bg-white rounded-lg transition-colors">A+</button>
+          <button onClick={() => setFontSize(prev => Math.max(20, prev - 4))} className="w-11 h-11 flex items-center justify-center text-stone-700 font-bold text-base active:bg-white rounded-lg transition-colors">A-</button>
+          <button onClick={() => setFontSize(prev => Math.min(60, prev + 4))} className="w-11 h-11 flex items-center justify-center text-stone-700 font-bold text-base active:bg-white rounded-lg transition-colors">A+</button>
         </div>
       </div>
 
@@ -109,38 +109,41 @@ const Reader: React.FC<ReaderProps> = ({ surah, onBack }) => {
         {ayahs.map((ayah, index) => (
           <div 
             key={ayah.number} 
-            className={`group relative py-10 px-6 md:px-10 transition-all duration-500 ${playingId === ayah.number ? 'bg-emerald-50/30' : 'hover:bg-stone-50/20'}`}
+            className={`group relative py-10 px-6 md:px-10 transition-all duration-500 ${playingId === ayah.number || speakingId === ayah.number ? 'bg-emerald-50/40' : 'hover:bg-stone-50/20'}`}
           >
             <div className="flex items-center justify-between mb-8">
-                <div className={`px-3 py-1 rounded-lg text-[10px] font-black tracking-widest ${playingId === ayah.number ? 'bg-emerald-700 text-white' : 'bg-stone-100 text-stone-400'}`}>
+                <div className={`px-4 py-2 rounded-xl text-[12px] font-black tracking-widest ${playingId === ayah.number || speakingId === ayah.number ? 'bg-emerald-700 text-white shadow-lg' : 'bg-stone-100 text-stone-400'}`}>
                     {surah.number}:{ayah.numberInSurah}
                 </div>
                 
                 <div className="flex items-center gap-3">
-                  {/* Share button */}
                   <button 
                     onClick={() => {
                         const shareText = `${ayah.text}\n\n"${hindi[index]?.text}"\n\n— कुरान ${surah.englishName} (${surah.number}:${ayah.numberInSurah})`;
-                        navigator.share ? navigator.share({ text: shareText }) : navigator.clipboard.writeText(shareText);
+                        if (navigator.share) {
+                          navigator.share({ text: shareText }).catch(() => {});
+                        } else {
+                          navigator.clipboard.writeText(shareText);
+                          alert('Copy ho gaya!');
+                        }
                     }}
-                    className="w-10 h-10 rounded-full bg-stone-50 text-stone-400 flex items-center justify-center border border-stone-100 active:scale-90"
+                    className="w-12 h-12 rounded-2xl bg-stone-50 text-stone-400 flex items-center justify-center border border-stone-100 active:scale-90"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6a3 3 0 100-2.684m0 2.684l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6a3 3 0 100-2.684m0 2.684l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
                   </button>
 
-                  {/* Arabic Audio */}
                   <button 
                       onClick={() => toggleAudio(ayah.number)}
-                      className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-300 ${
+                      className={`w-14 h-14 rounded-2xl flex items-center justify-center transition-all duration-300 ${
                           playingId === ayah.number 
-                          ? 'bg-emerald-700 text-white shadow-lg shadow-emerald-200' 
-                          : 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-100 active:scale-95'
+                          ? 'bg-emerald-700 text-white shadow-xl shadow-emerald-200' 
+                          : 'bg-emerald-50 text-emerald-700 border border-emerald-200 active:scale-95'
                       }`}
                   >
                       {playingId === ayah.number ? (
-                          <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                          <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
                       ) : (
-                          <svg className="w-6 h-6 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                          <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                       )}
                   </button>
                 </div>
@@ -153,14 +156,14 @@ const Reader: React.FC<ReaderProps> = ({ surah, onBack }) => {
               {ayah.text}
             </p>
             
-            <div className="bg-stone-50/50 p-6 rounded-3xl border border-stone-100 group-hover:bg-white group-hover:shadow-sm transition-all duration-500">
-                <div className="flex items-center justify-between mb-3">
-                  <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest px-2 py-0.5 bg-emerald-100/50 rounded">अनुवाद (हिन्दी)</span>
+            <div className={`p-6 rounded-[2rem] border transition-all duration-500 ${speakingId === ayah.number ? 'bg-emerald-50 border-emerald-200 shadow-inner' : 'bg-stone-50/50 border-stone-100'}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest px-3 py-1 bg-emerald-100/50 rounded-lg">अनुवाद (हिन्दी)</span>
                   <button 
                     onClick={() => handleSpeakHindi(hindi[index]?.text || '', ayah.number)}
-                    className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all active:scale-95 ${speakingId === ayah.number ? 'bg-emerald-700 text-white' : 'bg-white text-stone-500 border border-stone-200 shadow-sm'}`}
+                    className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-[11px] font-bold transition-all active:scale-95 shadow-sm ${speakingId === ayah.number ? 'bg-emerald-700 text-white' : 'bg-white text-stone-600 border border-stone-200'}`}
                   >
-                    <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
                     {speakingId === ayah.number ? 'सुन रहे हैं...' : 'अनुवाद सुनें'}
                   </button>
                 </div>
@@ -179,7 +182,7 @@ const Reader: React.FC<ReaderProps> = ({ surah, onBack }) => {
         <p className="text-[10px] font-black text-stone-300 uppercase tracking-[0.5em]">सूरह पूर्ण हुई</p>
         <button 
             onClick={onBack}
-            className="mt-6 px-8 py-3 bg-stone-900 text-white rounded-2xl text-xs font-black uppercase tracking-widest active:scale-95 transition-all"
+            className="mt-6 px-10 py-4 bg-emerald-950 text-white rounded-2xl text-[11px] font-black uppercase tracking-widest active:scale-95 transition-all shadow-xl shadow-emerald-900/10"
         >
             वापस जाएँ
         </button>

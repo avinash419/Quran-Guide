@@ -1,19 +1,27 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { EMOTIONS } from '../constants';
 import { Emotion, GuidanceResult } from '../types';
 import { getSpiritualGuidance } from '../services/geminiService';
 import { speakHindi } from '../services/ttsService';
+import { fetchAyahByReference, getAudioUrl } from '../services/quranApi';
 
 const SituationGuide: React.FC = () => {
   const [selected, setSelected] = useState<Emotion | null>(null);
   const [guidance, setGuidance] = useState<GuidanceResult | null>(null);
   const [loading, setLoading] = useState(false);
-  const [isSpeaking, setIsSpeaking] = useState(false);
+  const [isSpeakingTranslation, setIsSpeakingTranslation] = useState(false);
+  const [isSpeakingReflection, setIsSpeakingReflection] = useState(false);
+  const [isPlayingArabic, setIsPlayingArabic] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const handleSelect = async (emotion: Emotion) => {
     window.speechSynthesis.cancel();
-    setIsSpeaking(false);
+    audioRef.current?.pause();
+    setIsPlayingArabic(false);
+    setIsSpeakingTranslation(false);
+    setIsSpeakingReflection(false);
+    
     setSelected(emotion);
     setLoading(true);
     setGuidance(null);
@@ -27,14 +35,70 @@ const SituationGuide: React.FC = () => {
     }
   };
 
-  const handleSpeakHindi = (text: string) => {
-    if (isSpeaking) {
+  const handleArabicPlay = async () => {
+    if (!guidance) return;
+    
+    if (isPlayingArabic) {
+      audioRef.current?.pause();
+      setIsPlayingArabic(false);
+      return;
+    }
+
+    try {
       window.speechSynthesis.cancel();
-      setIsSpeaking(false);
+      setIsSpeakingTranslation(false);
+      setIsSpeakingReflection(false);
+      setIsPlayingArabic(true);
+
+      // Parse the reference (e.g. "Al-Baqarah 2:153")
+      // Extract "2:153"
+      const refMatch = guidance.reference.match(/\d+:\d+/);
+      if (refMatch) {
+        const ref = refMatch[0];
+        const ayahData = await fetchAyahByReference(ref);
+        const url = getAudioUrl(ayahData.number);
+        
+        audioRef.current = new Audio(url);
+        audioRef.current.play();
+        
+        audioRef.current.onended = () => {
+          setIsPlayingArabic(false);
+          // Automatic Hindi translation play after Arabic
+          setIsSpeakingTranslation(true);
+          speakHindi(guidance.ayahHindi, () => setIsSpeakingTranslation(false));
+        };
+      }
+    } catch (error) {
+      console.error("Audio error", error);
+      setIsPlayingArabic(false);
+    }
+  };
+
+  const handleSpeakTranslation = () => {
+    if (!guidance) return;
+    if (isSpeakingTranslation) {
+      window.speechSynthesis.cancel();
+      setIsSpeakingTranslation(false);
     } else {
-      setIsSpeaking(true);
-      speakHindi(text);
-      // Auto reset after some time or on new click
+      audioRef.current?.pause();
+      setIsPlayingArabic(false);
+      setIsSpeakingReflection(false);
+      setIsSpeakingTranslation(true);
+      speakHindi(guidance.ayahHindi, () => setIsSpeakingTranslation(false));
+    }
+  };
+
+  const handleSpeakReflection = () => {
+    if (!guidance) return;
+    if (isSpeakingReflection) {
+      window.speechSynthesis.cancel();
+      setIsSpeakingReflection(false);
+    } else {
+      audioRef.current?.pause();
+      setIsPlayingArabic(false);
+      setIsSpeakingTranslation(false);
+      setIsSpeakingReflection(true);
+      speakHindi(guidance.reflection, () => setIsSpeakingReflection(false));
     }
   };
 
@@ -79,7 +143,7 @@ const SituationGuide: React.FC = () => {
         <div className="fixed inset-0 z-[60] bg-white/80 backdrop-blur-md flex items-center justify-center p-6">
           <div className="bg-white p-12 rounded-[3rem] shadow-2xl text-center flex flex-col items-center gap-6 border border-emerald-100 animate-in zoom-in duration-300">
             <div className="relative">
-                <div className="w-16 h-16 border-4 border-emerald-100 border-t-emerald-700 rounded-full animate-spin"></div>
+                <div className="w-16 h-16 border-4 border-emerald-100 border-t-emerald-700 animate-spin"></div>
                 <div className="absolute inset-0 flex items-center justify-center">
                     <span className="text-xl animate-bounce">✨</span>
                 </div>
@@ -92,26 +156,51 @@ const SituationGuide: React.FC = () => {
       {guidance && (
         <div className="fixed inset-0 z-[70] bg-emerald-950/40 backdrop-blur-xl flex items-end sm:items-center justify-center p-4 animate-in fade-in duration-300">
             <div className="w-full max-w-xl bg-white rounded-[3rem] p-8 md:p-12 shadow-2xl relative overflow-hidden animate-in slide-in-from-bottom-20 duration-500 max-h-[90vh] overflow-y-auto">
-                {/* Close Button */}
                 <button 
-                  onClick={() => { window.speechSynthesis.cancel(); setGuidance(null); setSelected(null); setIsSpeaking(false); }}
-                  className="absolute top-6 right-6 w-10 h-10 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-colors z-20 active:scale-90"
+                  onClick={() => { window.speechSynthesis.cancel(); audioRef.current?.pause(); setGuidance(null); setSelected(null); setIsSpeakingTranslation(false); setIsSpeakingReflection(false); setIsPlayingArabic(false); }}
+                  className="absolute top-6 right-6 w-12 h-12 rounded-full bg-stone-100 text-stone-500 flex items-center justify-center hover:bg-red-50 hover:text-red-600 transition-colors z-20 active:scale-90 shadow-sm border border-stone-100"
                 >
-                  <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
+                  <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
 
-                <div className="relative z-10 flex flex-col gap-8 pb-4">
+                <div className="relative z-10 flex flex-col gap-8 pb-6">
                     <div className="space-y-6 text-center">
-                        <div className="inline-flex items-center gap-3 px-4 py-2 bg-emerald-50 rounded-full border border-emerald-100">
-                            <span className="text-[10px] font-black text-emerald-800 uppercase tracking-widest">आसमानी पैगाम</span>
+                        <div className="inline-flex items-center gap-3 px-5 py-2.5 bg-emerald-50 rounded-full border border-emerald-100 shadow-sm">
+                            <span className="text-[11px] font-black text-emerald-800 uppercase tracking-widest">आसमानी पैगाम</span>
                         </div>
                         
                         <div className="space-y-6">
+                            <div className="flex justify-center mb-4">
+                               <button 
+                                  onClick={handleArabicPlay}
+                                  className={`w-16 h-16 rounded-3xl flex items-center justify-center transition-all duration-300 shadow-xl ${
+                                      isPlayingArabic 
+                                      ? 'bg-emerald-700 text-white shadow-emerald-200 animate-pulse' 
+                                      : 'bg-emerald-50 text-emerald-700 border border-emerald-100 active:scale-90 hover:bg-emerald-100'
+                                  }`}
+                               >
+                                  {isPlayingArabic ? (
+                                      <svg className="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/></svg>
+                                  ) : (
+                                      <svg className="w-8 h-8 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                                  )}
+                               </button>
+                            </div>
+
                             <p className="arabic-text text-3xl md:text-4xl text-emerald-950 leading-[1.8] text-center drop-shadow-sm px-2">
                                 {guidance.ayahArabic}
                             </p>
                             
-                            <div className="relative px-4">
+                            <div className={`relative px-6 py-6 rounded-[2rem] border transition-all duration-500 ${isSpeakingTranslation ? 'bg-emerald-50 border-emerald-200 shadow-inner' : 'bg-stone-50/30 border-stone-100'}`}>
+                                <div className="flex items-center justify-between mb-4">
+                                  <span className="text-[9px] font-black text-emerald-600 uppercase tracking-widest">अनुवाद</span>
+                                  <button 
+                                    onClick={handleSpeakTranslation}
+                                    className={`w-10 h-10 rounded-full flex items-center justify-center transition-all active:scale-90 shadow-sm ${isSpeakingTranslation ? 'bg-emerald-700 text-white' : 'bg-white text-emerald-700 border border-emerald-100'}`}
+                                  >
+                                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                                  </button>
+                                </div>
                                 <p className="text-lg md:text-xl text-stone-800 font-bold leading-relaxed relative z-10 italic">
                                     “{guidance.ayahHindi}”
                                 </p>
@@ -122,28 +211,28 @@ const SituationGuide: React.FC = () => {
                         </div>
                     </div>
 
-                    <div className="bg-stone-50 rounded-[2.5rem] p-8 border border-stone-100 relative group overflow-hidden">
-                        <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-600"></div>
+                    <div className={`rounded-[2.5rem] p-8 border relative group overflow-hidden transition-all duration-500 ${isSpeakingReflection ? 'bg-emerald-50 border-emerald-300' : 'bg-emerald-950 border-emerald-900 shadow-2xl shadow-emerald-900/40'}`}>
+                        <div className="absolute top-0 left-0 w-1.5 h-full bg-emerald-500"></div>
                         <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-[10px] font-black text-emerald-700 uppercase tracking-widest flex items-center gap-2">
+                          <h4 className={`text-[11px] font-black uppercase tracking-widest flex items-center gap-2 ${isSpeakingReflection ? 'text-emerald-800' : 'text-emerald-100'}`}>
                             चिन्तन (Reflection)
                           </h4>
                           <button 
-                            onClick={() => handleSpeakHindi(guidance.reflection)}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold transition-all active:scale-95 ${isSpeaking ? 'bg-emerald-700 text-white' : 'bg-white text-emerald-700 border border-emerald-200 shadow-sm'}`}
+                            onClick={handleSpeakReflection}
+                            className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl text-[11px] font-bold transition-all active:scale-95 shadow-lg ${isSpeakingReflection ? 'bg-emerald-700 text-white' : 'bg-white text-emerald-950 shadow-emerald-950/20'}`}
                           >
-                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
-                            {isSpeaking ? 'सुन रहे हैं...' : 'चिंतन सुनें'}
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+                            {isSpeakingReflection ? 'सुन रहे हैं...' : 'चिंतन सुनें'}
                           </button>
                         </div>
-                        <p className="text-base leading-relaxed text-stone-600 font-medium">
+                        <p className={`text-base leading-relaxed font-medium ${isSpeakingReflection ? 'text-emerald-900' : 'text-emerald-50'}`}>
                             {guidance.reflection}
                         </p>
                     </div>
 
                     <button 
-                      onClick={() => { window.speechSynthesis.cancel(); setGuidance(null); setSelected(null); setIsSpeaking(false); }}
-                      className="w-full py-5 bg-emerald-900 text-white rounded-[1.5rem] font-black text-xs uppercase tracking-[0.3em] shadow-xl shadow-emerald-900/20 hover:bg-emerald-800 transition-all hover:scale-[1.02] active:scale-95"
+                      onClick={() => { window.speechSynthesis.cancel(); audioRef.current?.pause(); setGuidance(null); setSelected(null); setIsSpeakingTranslation(false); setIsSpeakingReflection(false); setIsPlayingArabic(false); }}
+                      className="w-full py-5 bg-emerald-900 text-white rounded-[2rem] font-black text-xs uppercase tracking-[0.4em] shadow-xl shadow-emerald-900/30 hover:bg-emerald-800 transition-all hover:scale-[1.02] active:scale-95 border border-white/10"
                     >
                       शुक्रिया (बन्द करें)
                     </button>

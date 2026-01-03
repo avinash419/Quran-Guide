@@ -1,5 +1,5 @@
 
-export const speakHindi = (text: string) => {
+export const speakHindi = (text: string, onEnd?: () => void) => {
   if (!('speechSynthesis' in window)) {
     console.error("Speech synthesis not supported");
     return;
@@ -12,6 +12,10 @@ export const speakHindi = (text: string) => {
   utterance.lang = 'hi-IN';
   utterance.rate = 0.9; // Slightly slower for clarity
   utterance.pitch = 1.0;
+
+  if (onEnd) {
+    utterance.onend = onEnd;
+  }
 
   // Try to find a better quality Hindi voice if available
   const voices = window.speechSynthesis.getVoices();

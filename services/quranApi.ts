@@ -24,7 +24,13 @@ export const fetchSurahDetails = async (surahNumber: number): Promise<{ ayahs: A
   };
 };
 
-export const fetchRandomAyah = async (): Promise<{ arabic: string, hindi: string, reference: string }> => {
+export const fetchAyahByReference = async (reference: string): Promise<Ayah> => {
+  const response = await fetch(`${BASE_URL}/ayah/${reference}`);
+  const data: QuranResponse<Ayah> = await response.json();
+  return data.data;
+};
+
+export const fetchRandomAyah = async (): Promise<{ arabic: string, hindi: string, reference: string, number: number }> => {
   const random = Math.floor(Math.random() * 6236) + 1;
   const [arabicRes, hindiRes] = await Promise.all([
     fetch(`${BASE_URL}/ayah/${random}`),
@@ -37,13 +43,11 @@ export const fetchRandomAyah = async (): Promise<{ arabic: string, hindi: string
   return {
     arabic: arabicData.data.text,
     hindi: hindiData.data.text,
+    number: arabicData.data.number,
     reference: `${arabicData.data.surah.englishName} (${arabicData.data.surah.number}:${arabicData.data.numberInSurah})`
   };
 };
 
 export const getAudioUrl = (ayahNumber: number): string => {
-  // Use a reliable audio CDN. Padded with leading zeros if necessary
-  // format: https://audio.qurancdn.com/Alafasy/mp3/001001.mp3 is often broken.
-  // Using AlQuran.cloud global audio endpoint:
   return `https://cdn.islamic.network/quran/audio/128/ar.alafasy/${ayahNumber}.mp3`;
 };
