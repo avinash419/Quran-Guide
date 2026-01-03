@@ -33,6 +33,7 @@ export enum AppSection {
   SURAH_LIST = 'surah_list',
   READER = 'reader',
   SITUATIONS = 'situations',
+  PRAYER_GUIDE = 'prayer_guide',
 }
 
 export enum Emotion {

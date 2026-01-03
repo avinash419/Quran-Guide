@@ -6,6 +6,7 @@ import DailyAyah from './components/DailyAyah';
 import SurahList from './components/SurahList';
 import SituationGuide from './components/SituationGuide';
 import Reader from './components/Reader';
+import PrayerGuide from './components/PrayerGuide';
 
 const App: React.FC = () => {
   const [section, setSection] = useState<AppSection>(AppSection.HOME);
@@ -57,6 +58,22 @@ const App: React.FC = () => {
                 </button>
 
                 <button 
+                  onClick={() => setSection(AppSection.PRAYER_GUIDE)}
+                  className="group p-8 bg-white rounded-[2.5rem] text-left transition-all duration-500 border border-stone-50 shadow-xl shadow-stone-200/30 hover:shadow-emerald-900/10 active:scale-[0.98] relative overflow-hidden"
+                >
+                  <div className="relative z-10 flex items-center gap-6">
+                    <div className="w-16 h-16 bg-emerald-50 rounded-2xl flex items-center justify-center text-3xl group-hover:scale-110 transition-transform duration-500 group-hover:bg-emerald-900 group-hover:text-white">
+                        <span>🕌</span>
+                    </div>
+                    <div>
+                        <span className="font-black text-stone-900 block text-xl serif-heading">नमाज़ का तरीका</span>
+                        <span className="text-[10px] text-stone-400 font-black uppercase tracking-wider mt-1 block">स्टेप-बाय-स्टेप गाइड</span>
+                    </div>
+                  </div>
+                  <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-50 opacity-20 -mr-12 -mt-12 rounded-full"></div>
+                </button>
+
+                <button 
                   onClick={() => setSection(AppSection.SURAH_LIST)}
                   className="group p-8 bg-white rounded-[2.5rem] text-left transition-all duration-500 border border-stone-50 shadow-xl shadow-stone-200/30 hover:shadow-emerald-900/10 active:scale-[0.98] relative overflow-hidden"
                 >
@@ -92,6 +109,8 @@ const App: React.FC = () => {
         return <SurahList onSelect={handleSurahSelect} />;
       case AppSection.SITUATIONS:
         return <SituationGuide />;
+      case AppSection.PRAYER_GUIDE:
+        return <PrayerGuide />;
       case AppSection.READER:
         return selectedSurah ? (
           <Reader surah={selectedSurah} onBack={() => setSection(AppSection.SURAH_LIST)} />
