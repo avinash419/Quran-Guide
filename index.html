@@ -18,12 +18,14 @@
         html {
           scroll-behavior: smooth;
           -webkit-tap-highlight-color: transparent;
+          background-color: var(--brand-light);
         }
         body {
             font-family: 'Noto Sans Devanagari', sans-serif;
             background-color: var(--brand-light);
             -webkit-font-smoothing: antialiased;
             overscroll-behavior-y: contain;
+            min-height: 100vh;
         }
         .arabic-text {
             font-family: 'Amiri', serif;
@@ -33,11 +35,9 @@
         .serif-heading {
             font-family: 'Playfair Display', serif;
         }
-        /* Optimized for mobile touch targets */
         button, a {
             touch-action: manipulation;
         }
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
           width: 4px;
         }
@@ -48,13 +48,42 @@
           background: #064e3b22;
           border-radius: 10px;
         }
-        @keyframes subtle-float {
-          0% { transform: translateY(0px); }
-          50% { transform: translateY(-8px); }
-          100% { transform: translateY(0px); }
+        /* Root loading state before React mounts */
+        #root:empty {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            background-color: var(--brand-light);
+            gap: 1.5rem;
         }
-        .float-animation {
-          animation: subtle-float 4s ease-in-out infinite;
+        #root:empty::before {
+            content: "Q";
+            font-family: 'Playfair Display', serif;
+            font-size: 2rem;
+            font-weight: 900;
+            color: #064e3b;
+            width: 64px;
+            height: 64px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: white;
+            border-radius: 1.5rem;
+            box-shadow: 0 10px 25px -5px rgba(6, 78, 59, 0.1);
+        }
+        #root:empty::after {
+            content: "";
+            width: 24px;
+            height: 24px;
+            border: 3px solid #064e3b11;
+            border-top-color: #064e3b;
+            border-radius: 50%;
+            animation: spin 0.8s cubic-bezier(0.5, 0.1, 0.4, 0.9) infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
         }
         .safe-pb {
             padding-bottom: calc(6rem + var(--safe-area-inset-bottom, 0px));
@@ -63,15 +92,18 @@
 <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
     "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/client": "https://esm.sh/react-dom@^19.2.3/client",
+    "@google/genai": "https://esm.sh/@google/genai@^1.34.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "@google/genai": "https://esm.sh/@google/genai@^1.34.0"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
 </head>
 <body class="text-slate-900 min-h-screen select-none">
     <div id="root"></div>
+    <!-- This script tag is essential for the application to load and run -->
+    <script type="module" src="./index.tsx"></script>
 </body>
 </html>
